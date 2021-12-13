@@ -17,6 +17,124 @@ from native import *
 from internal_classes import *
 import colorsys
 import os
+import settings
+import numpy as np
+import math
+
+mySettings = settings.getSettings()
+
+def lbInit():
+    settings.printData(mySettings)
+    settings.printData(mySettings.minimum)
+    return
+
+def draw_angled_rec(x0, y0, width, height, angle, color, img):
+    _angle = angle * math.pi / 180.0
+    b = math.cos(_angle) * 0.5
+    a = math.sin(_angle) * 0.5
+    pt0 = (int(x0 - a * height - b * width),
+           int(y0 + b * height - a * width))
+    pt1 = (int(x0 + a * height - b * width),
+           int(y0 - b * height - a * width))
+    pt2 = (int(2 * x0 - pt0[0]), int(2 * y0 - pt0[1]))
+    pt3 = (int(2 * x0 - pt1[0]), int(2 * y0 - pt1[1]))
+
+    cv2.line(img, pt0, pt1, color, 3)
+    cv2.line(img, pt1, pt2, color, 3)
+    cv2.line(img, pt2, pt3, color, 3)
+    cv2.line(img, pt3, pt0, color, 3)
+
+def correctShape(shape: Shape):
+    if shape.type_id == 2:      # rectangle      
+       return shape
+       
+    return shape
+
+def appendZeroDegree(data):
+    dataLength = len(data)
+    if dataLength == 4:
+        data.append(0)    # Add zero rotation angle
+    elif dataLength > 4:
+        data[4] = 0
+
+def htmlRectangleToRotatingRectangle(hShape):    
+    hShape['type'] = 2 # Rotated rectangle
+    appendZeroDegree(hShape['data'])    
+    return htmlShapeToRotatingRectangle(hShape)
+
+def htmlShapeToEllipsis(hShape):
+    # Rotated ellipsis
+    # hShape.color = [r,g,b,a]
+    # hShape.data = [x,y,w,h,rot_deg]
+    x,y,w,h,rot_deg = hShape['data']
+    r,g,b,a         = hShape['color']
+    return Shape(hShape['type'], x, y, w, h, rot_deg, Color(r,g,b,a), False)
+
+def htmlShapeToRotatingRectangle(hShape):
+    # Rotated rectangle
+    x1,y1,x2,y2,rot_deg = hShape['data']
+    r,g,b,a             = hShape['color']
+    width = x2 - x1
+    heigh = y2 - y1
+    x = x1 + width//2
+    y = y1 + heigh//2
+    return Shape(hShape['type'], x, y, width, heigh, rot_deg, Color(r,g,b,a), False)
+
+def convertCircleToRotatingEllipse(hShape):     
+    if (hShape['type'] != 8): 
+        raise Exception("Can only convert circles (type 8) to ellipse, but got type {0:x}".format(hShape['type']))
+    hShape['type'] = 16         # change type from circle to ellipse
+    appendZeroDegree(hShape['data'])    
+
+    return hShape
+
+def htmlShapeToShape(hShape):    
+    # Currently only supporting circles, rotated ellipsis and rectangels, rotated rectangels
+    shapeType = hShape['type']
+
+    if shapeType == 8:     # Circle
+        hShape = convertCircleToRotatingEllipse(hShape)
+        shapeType = hShape['type']
+    
+    if shapeType == 1:   # Rectangle        
+        return htmlRectangleToRotatingRectangle(hShape)
+    elif shapeType == 2:     # Rotating Rectangle
+        return htmlShapeToRotatingRectangle(hShape)    
+    elif shapeType == 16:  # Rotating Ellipse
+        # Rotated ellipsis       
+        return htmlShapeToEllipsis(hShape)
+    
+    raise Exception("Unsupported shape type {0:x}".format(shapeType))
+
+
+def addValidShape(shapes, shape):   
+    sType = shape['type']
+    if sType == 16 or sType == 2 or sType == 1 or sType == 8:
+        shapes.append(htmlShapeToShape(shape))
+    else:
+        # Not handling other shapes currently
+        print("Unsupported shape in geometry file.\nCurrently only supporting circles, rotated ellipsis , regtangles and rotated regtangles.")
+        return False
+  
+    return True
+
+def drawShape(img, shape):
+    if not hasattr(shape, 'type_id'):
+        print(json.dumps(shape))
+        return img
+
+    if shape.type_id == 2:
+        ## draw rotated rectangle
+        draw_angled_rec(shape.x, shape.y, shape.h, shape.w, -90 + shape.rot_deg, (shape.color.b, shape.color.g, shape.color.r) , img)                
+    elif shape.type_id == 1:
+        ## draw rectangle
+        img = cv2.rectangle(img, (shape.x, shape.y), (shape.h,shape.w), (shape.color.b, shape.color.g, shape.color.r), thickness=-1)        
+    elif shape.type_id == 16:
+        ## draw ellipse
+        img = cv2.ellipse(img, (shape.x, shape.y), (shape.h,shape.w), -90 + shape.rot_deg, 0., 360, (shape.color.b, shape.color.g, shape.color.r), thickness=-1)    
+    else:
+        raise Exception("Unsupported shape type {0:x}".format(shape.type_id))
+    return img
 
 def is_admin():
     try:
@@ -64,6 +182,17 @@ def calculate_CLivery(pid):
         return -1
     return cLivery
 
+def getSaleDivisorForShapeType(typeId: int): 
+     scale_divisor = 63 
+     if typeId == 2:
+        scale_divisor = 127
+     elif typeId == 16:
+        scale_divisor = 63
+     else: 
+        scale_divisor = 127
+
+     return scale_divisor
+
 def draw_memory_shape(pid: int, shape: Shape, index: int, cLiveryLayerTable: int, liveryCount: int):
     if index >= liveryCount:
         return
@@ -78,8 +207,11 @@ def draw_memory_shape(pid: int, shape: Shape, index: int, cLiveryLayerTable: int
     write_process_memory(pid, current_layer_address + 0x50, rot_data)
     color_data = shape.color.get_struct()
     write_process_memory(pid, current_layer_address + 0x74, color_data)
-    if shape.type_id == 16:
+    if shape.type_id == 16:   
         shape_id_data = struct.pack('B', 102)
+        write_process_memory(pid, current_layer_address + 0x7A, shape_id_data)
+    elif shape.type_id == 2:
+        shape_id_data = struct.pack('B', 101)
         write_process_memory(pid, current_layer_address + 0x7A, shape_id_data)
     elif shape.type_id == 1:
         shape_id_data = struct.pack('B', 101)
@@ -87,7 +219,8 @@ def draw_memory_shape(pid: int, shape: Shape, index: int, cLiveryLayerTable: int
     mask_flag = struct.pack('B', 1 if shape.is_mask else 0)
     write_process_memory(pid, current_layer_address + 0x78, mask_flag)
 
-def main(args):
+def main(args):    
+    lbInit();
     if not is_64bit():
         print("Your Python version is 32-bit. Please install 64-bit Python.\nThis is required for IPC with Forza Horizon as it is 64-bit.")
         return
@@ -106,7 +239,7 @@ def main(args):
             data = json.load(f)
             # Validate the loaded json
             try:
-                valid = len(data['shapes'][0]['data']) == 4
+                valid = True # len(data['shapes'][0]['data']) == 4
                 print(data['shapes'][0]['type'])
                 valid = valid and data['shapes'][0]['type'] > 0
                 valid = valid and len(data['shapes'][0]['color']) == 4
@@ -130,18 +263,11 @@ def main(args):
         shapes.append(Shape(1, int(image_w//2), int(image_h//2), image_w, image_h, 0, Color(bg_r,bg_g,bg_b,bg_a), False))
 
     for shape in data['shapes'][1:]:
-        #shape.color = [r,g,b,a]
-        #shape.data = [x,y,w,h,rot_deg]
-        # Currently only supporting rotated ellipsis
-        if shape['type'] == 16:
-            # Rotated ellipsis
-            x,y,w,h,rot_deg = shape['data']
-            r,g,b,a = shape['color']
-            shapes.append(Shape(shape['type'], x, y, w, h, rot_deg, Color(r,g,b,a), False))
+        if addValidShape(shapes, shape):
+            continue
         else:
-            # Not handling other shapes currently
-            print("Unsupported shape in geometry file.\nCurrently only supporting rotated ellipsis.")
             return
+        
     if len(shapes) == 0:
         print("No shapes were loaded. Check your exported Geometrize geometry .json")
         return
@@ -150,7 +276,7 @@ def main(args):
     preview = np.zeros((image_h, image_w, 3), np.uint8)
     preview = cv2.rectangle(preview, (0,0), (image_w, image_h), (bg_b, bg_g, bg_r, bg_a), thickness=-1)
     for shape in shapes:
-        preview = cv2.ellipse(preview, (shape.x, shape.y), (shape.h,shape.w), -90 + shape.rot_deg, 0., 360, (shape.color.b, shape.color.g, shape.color.r), thickness=-1)
+        preview = drawShape(preview, shape)
     
     # show our preview before putting it in forza
     print("Here is a preview of your image, click it then press any key to start!")
@@ -174,9 +300,11 @@ def main(args):
     
     # If we have less than 100 shapes, user has likely made a mistake
     current_livery_count = read_int(pid, cLiveryGroup + 0x5A)
-    if current_livery_count < 100:
+
+    #LB change minimum from 100 to 2
+    if current_livery_count < mySettings.minimum:
         print("READ THE INSTRUCTIONS")
-        print("You must load a vinyl group (ALL SPHERES) with your desired shape count (minimum 100) first!")
+        print("You must load a vinyl group (ALL SPHERES) with your desired shape count (minimum {0:x}) first!".format(mySettings.minimum))
         print("500, 1000, 1500, 2000 or 3000 is recommended")
         print("Make sure to ungroup the vinyl before starting also!")
         return
