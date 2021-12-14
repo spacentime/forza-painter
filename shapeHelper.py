@@ -37,12 +37,20 @@ def drawShape(img, shape):
         raise Exception("Unsupported shape type {0:x}".format(shape.type_id))
     return img
 
-def appendZeroDegree(data):
+
+def appendAt(data, index:int, value):
     dataLength = len(data)
-    if dataLength == 4:
-        data.append(0)    # Add zero rotation angle
-    elif dataLength > 4:
-        data[4] = 0
+    if dataLength < index:
+        raise Exception("appendAt currently does not support shorter Array {0:x}, {1:x}".format(dataLength, index ))
+    if dataLength == index:
+        data.append(value)    # Add zero rotation angle
+    elif dataLength > index:
+        data[index] = value
+    return data
+
+def appendZeroDegree(data):
+    return appendAt(data, 4, 0)
+
 
 def htmlRectangleToRotatingRectangle(hShape):    
     hShape['type'] = 2 # Rotated rectangle
@@ -72,7 +80,8 @@ def convertCircleToRotatingEllipse(hShape):
         raise Exception("Can only convert circles (type 32) to rotating ellipse (type 16), but got type {0:x}".format(hShape['type']))
     
     x, y, r = hShape['data']
-    hShape['data'] = [x, y, r, r, 0]
+    appendAt(hShape['data'], 3, r)
+    appendZeroDegree(hShape['data'])    
     hShape['type'] = 16         # change type from circle to rotating ellipse    
 
     return hShape

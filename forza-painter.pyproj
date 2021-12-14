@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{27205fc6-9c93-4b07-980b-bd09ea337e58}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>internal_classes.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="imgs\001-global-settings.png" />
+    <Content Include="imgs\002-image-settings.png" />
+    <Content Include="imgs\003-exporter-settings.png" />
+    <Content Include="imgs\ayylmao.png" />
+    <Content Include="licence.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="internal_classes.py" />
+    <Compile Include="main.py" />
+    <Compile Include="native.py" />
+    <Compile Include="settings.py" />
+    <Compile Include="shapeHelper.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="imgs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
