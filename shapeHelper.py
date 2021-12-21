@@ -1,23 +1,31 @@
+from sys import winver
 from internal_classes import *
 import cv2
 import math  
 import json
+import numpy as np
 
-def draw_angled_rec(x0, y0, width, height, angle, color, img):
+def get_rectangle_points(centerPoint, dimensions, angle):
+    x, y = centerPoint
+    width, height = dimensions
     _angle = angle * math.pi / 180.0
     b = math.cos(_angle) * 0.5
     a = math.sin(_angle) * 0.5
-    pt0 = (int(x0 - a * height - b * width),
-           int(y0 + b * height - a * width))
-    pt1 = (int(x0 + a * height - b * width),
-           int(y0 - b * height - a * width))
-    pt2 = (int(2 * x0 - pt0[0]), int(2 * y0 - pt0[1]))
-    pt3 = (int(2 * x0 - pt1[0]), int(2 * y0 - pt1[1]))
+    point1 = (int(x - a * height - b * width), int(y + b * height - a * width))
+    point2 = (int(x + a * height - b * width), int(y - b * height - a * width))
+    point3 = (int(2 * x - point1[0])         , int(2 * y - point1[1]))
+    point4 = (int(2 * x - point2[0])         , int(2 * y - point2[1]))
 
-    cv2.line(img, pt0, pt1, color, 3)
-    cv2.line(img, pt1, pt2, color, 3)
-    cv2.line(img, pt2, pt3, color, 3)
-    cv2.line(img, pt3, pt0, color, 3)
+    return np.array([point1, point2, point3, point4])
+
+def draw_angled_rectangle(image, centerPoint, dimensions, angle, color , fill:bool):        
+    points = get_rectangle_points(centerPoint, dimensions, angle)
+    contours = [points]
+    if fill:
+        cv2.fillPoly(image, pts = contours, color = color)
+    else:
+        thickness = 2
+        cv2.drawContours(image, contours, 0, color, thickness)        
 
 def drawShape(img, shape):
     if not hasattr(shape, 'type_id'):
@@ -25,8 +33,9 @@ def drawShape(img, shape):
         return img
 
     if shape.type_id == 2:
-        ## draw rotated rectangle
-        draw_angled_rec(shape.x, shape.y, shape.h, shape.w, -90 + shape.rot_deg, (shape.color.b, shape.color.g, shape.color.r) , img)                
+        ## draw rotated rectangle        
+        draw_angled_rectangle(img, (shape.x, shape.y), (shape.h, shape.w), -90 + shape.rot_deg, (shape.color.b, shape.color.g, shape.color.r), True)                
+
     elif shape.type_id == 1:
         ## draw rectangle
         img = cv2.rectangle(img, (shape.x, shape.y), (shape.h,shape.w), (shape.color.b, shape.color.g, shape.color.r), thickness=-1)        
@@ -56,7 +65,7 @@ def appendZeroDegree(data):
     return appendAt(data, 4, 0)
 
 
-def htmlRectangleToRotatingRectangle(hShape):    
+def htmlRectangleToRotatingRectangle(hShape) -> Shape:
     hShape['type'] = 2 # Rotated rectangle
     appendZeroDegree(hShape['data'])    
     return htmlShapeToRotatingRectangle(hShape)
@@ -69,7 +78,7 @@ def htmlShapeToEllipsis(hShape):
     r,g,b,a         = hShape['color']
     return Shape(hShape['type'], x, y, w, h, rot_deg, Color(r,g,b,a), False)
 
-def htmlShapeToRotatingRectangle(hShape):
+def htmlShapeToRotatingRectangle(hShape) -> Shape:
     # Rotated rectangle
     x1,y1,x2,y2,rot_deg = hShape['data']
     r,g,b,a             = hShape['color']
@@ -122,7 +131,7 @@ def convertToKnownShape(hShape):
 
     return hShape
 
-def htmlShapeToShape(hShape):    
+def htmlShapeToShape(hShape) -> Shape:    
     # Currently only supporting circles, ellipsis, rotated ellipsis and rectangels, rotated rectangels
     hShape = convertToKnownShape(hShape)
 
@@ -141,7 +150,7 @@ def htmlShapeToShape(hShape):
     raise Exception("Unsupported shape type {0:x}".format(shapeType))
 
 
-def addValidShape(shapes, shape):   
+def addValidShape(shapes, shape) -> bool:
     sType = shape['type']
     # regtangles 1, rotated regtangles 2, triangle 4, ellipsis 8, rotated ellipsis 16 and circles 32 
     if sType == 1 or sType == 2 or sType == 4 or sType == 8 or sType == 16 or sType == 32:
