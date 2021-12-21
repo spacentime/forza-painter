@@ -28,6 +28,7 @@
   <ItemGroup>
     <Compile Include="internal_classes.py" />
     <Compile Include="main.py" />
+    <Compile Include="memoryDrawer.py" />
     <Compile Include="native.py" />
     <Compile Include="settings.py" />
     <Compile Include="shapeHelper.py" />

@@ -30,6 +30,10 @@ def drawShape(img, shape):
     elif shape.type_id == 1:
         ## draw rectangle
         img = cv2.rectangle(img, (shape.x, shape.y), (shape.h,shape.w), (shape.color.b, shape.color.g, shape.color.r), thickness=-1)        
+
+    elif shape.type_id == 4:  # triangle
+        ## draw rectangle for now
+        img = cv2.rectangle(img, (shape.x, shape.y), (shape.h,shape.w), (shape.color.b, shape.color.g, shape.color.r), thickness=-1)  
     elif shape.type_id == 16:
         ## draw ellipse
         img = cv2.ellipse(img, (shape.x, shape.y), (shape.h,shape.w), -90 + shape.rot_deg, 0., 360, (shape.color.b, shape.color.g, shape.color.r), thickness=-1)    
@@ -75,6 +79,19 @@ def htmlShapeToRotatingRectangle(hShape):
     y = y1 + heigh//2
     return Shape(hShape['type'], x, y, width, heigh, rot_deg, Color(r,g,b,a), False)
 
+def htmlShapeToRotatingTriangle(hShape):
+    # Rotated rectangle
+    x1,y1,x2,y2,x3,y3 = hShape['data']
+    r,g,b,a           = hShape['color']
+
+    rot_deg = 0
+    width = x2 - x1
+    heigh = (y3 - y1)
+    x = x1 + width//2
+    y = y1 + heigh//2
+    heigh = - heigh
+    return Shape(hShape['type'], x, y, width, heigh, rot_deg, Color(r,g,b,a), False)
+
 def convertCircleToRotatingEllipse(hShape):     
     if (hShape['type'] != 32): 
         raise Exception("Can only convert circles (type 32) to rotating ellipse (type 16), but got type {0:x}".format(hShape['type']))
@@ -115,6 +132,8 @@ def htmlShapeToShape(hShape):
         return htmlRectangleToRotatingRectangle(hShape)
     elif shapeType == 2:     # Rotating Rectangle
         return htmlShapeToRotatingRectangle(hShape)    
+    elif shapeType == 4:     # Triangle
+        return htmlShapeToRotatingTriangle(hShape)    
     elif shapeType == 16:  # Rotating Ellipse
         # Rotated ellipsis       
         return htmlShapeToEllipsis(hShape)
@@ -124,12 +143,12 @@ def htmlShapeToShape(hShape):
 
 def addValidShape(shapes, shape):   
     sType = shape['type']
-    # regtangles 1, rotated regtangles 2, ellipsis 8, rotated ellipsis 16 and circles 32 
-    if sType == 1 or sType == 2 or sType == 8 or sType == 16 or sType == 32:
+    # regtangles 1, rotated regtangles 2, triangle 4, ellipsis 8, rotated ellipsis 16 and circles 32 
+    if sType == 1 or sType == 2 or sType == 4 or sType == 8 or sType == 16 or sType == 32:
         shapes.append(htmlShapeToShape(shape))
     else:
         # Not handling other shapes currently
-        print("Unsupported shape in geometry file.\nCurrently only supporting circles, ellipsis, rotated ellipsis , regtangles and rotated regtangles.")
+        print("Unsupported shape in geometry file.\nCurrently only supporting circles, ellipsis, rotated ellipsis, triangles, regtangles and rotated regtangles.")
         return False
   
     return True

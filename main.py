@@ -19,6 +19,7 @@ import colorsys
 import os
 import settings
 import shapeHelper
+import memoryDrawer
 
 mySettings = settings.getSettings()
 
@@ -83,32 +84,6 @@ def getSaleDivisorForShapeType(typeId: int):
         scale_divisor = 127
 
      return scale_divisor
-
-def draw_memory_shape(pid: int, shape: Shape, index: int, cLiveryLayerTable: int, liveryCount: int):
-    if index >= liveryCount:
-        return
-    current_layer_address = dereference_pointer(pid, cLiveryLayerTable + (index * 0x8))
-    print("{0:x}".format(current_layer_address))
-    pos_data = struct.pack('f', shape.x) + struct.pack('f', -shape.y)
-    write_process_memory(pid, current_layer_address + 0x18, pos_data)
-    scale_divisor = 63 if shape.type_id == 16 else 127
-    scale_data = struct.pack('f', shape.w / scale_divisor) + struct.pack('f', shape.h / scale_divisor)
-    write_process_memory(pid, current_layer_address + 0x28, scale_data)
-    rot_data = struct.pack('f', 360 - shape.rot_deg)
-    write_process_memory(pid, current_layer_address + 0x50, rot_data)
-    color_data = shape.color.get_struct()
-    write_process_memory(pid, current_layer_address + 0x74, color_data)
-    if shape.type_id == 16:   
-        shape_id_data = struct.pack('B', 102)
-        write_process_memory(pid, current_layer_address + 0x7A, shape_id_data)
-    elif shape.type_id == 2:
-        shape_id_data = struct.pack('B', 101)
-        write_process_memory(pid, current_layer_address + 0x7A, shape_id_data)
-    elif shape.type_id == 1:
-        shape_id_data = struct.pack('B', 101)
-        write_process_memory(pid, current_layer_address + 0x7A, shape_id_data)
-    mask_flag = struct.pack('B', 1 if shape.is_mask else 0)
-    write_process_memory(pid, current_layer_address + 0x78, mask_flag)
 
 def main(args):    
     lbInit();
@@ -223,7 +198,7 @@ def main(args):
     
     # Enumerate the shapes, drawing them as we go
     for i,shape in enumerate(shapes):
-        draw_memory_shape(pid, shape, i, cLiveryLayerTable, current_livery_count)
+        memoryDrawer.draw_memory_shape(pid, shape, i, cLiveryLayerTable, current_livery_count)
     
     print("DONE!")
 
